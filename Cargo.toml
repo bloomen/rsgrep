@@ -1,0 +1,13 @@
+[package]
+name = "rsgrep"
+version = "0.1.0"
+authors = ["Christian Blume <chr.blume@gmail.com>"]
+edition = "2018"
+license = "MIT"
+description = "grep implemented in Rust"
+homepage = "https://github.com/bloomen/rsgrep"
+documentation = "https://github.com/bloomen/rsgrep"
+repository = "https://github.com/bloomen/rsgrep"
+readme = "README.md"
+
+[dependencies]
