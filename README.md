@@ -1,1 +1,1 @@
-`grep` implemented in Rust.
+A simple version of grep implemented in Rust.
