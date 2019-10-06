@@ -28,9 +28,9 @@ fn main() {
     let reader = BufReader::new(file);
 
     for (i, line) in reader.lines().enumerate() {
-        let str = line.unwrap();
-        if str.contains(string) {
-            println!("{}:{}", i + 1, str);
+        let line = line.unwrap();
+        if line.contains(string) {
+            println!("{}:{}", i + 1, line);
         }
     }
 }
