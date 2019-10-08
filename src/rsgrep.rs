@@ -38,7 +38,7 @@ fn resolve_path(config: &Config, path: &Path) -> Option<PathBuf> {
     }
 }
 
-pub fn search_file(config: &Config, string: &str, path: &Path) {
+fn search_file(config: &Config, string: &str, path: &Path) {
     if !path.exists() {
         println!(
             "<rsgrep> Error: Path does not exist: {}",
@@ -82,7 +82,7 @@ pub fn search_file(config: &Config, string: &str, path: &Path) {
     }
 }
 
-pub fn search_dir(config: &Config, string: &str, dir: &Path) {
+fn search_dir(config: &Config, string: &str, dir: &Path) {
     if !dir.exists() {
         println!(
             "<rsgrep> Error: Path does not exist: {}",
