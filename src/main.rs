@@ -41,17 +41,28 @@ fn main() {
                 .help("Follow links")
                 .takes_value(false),
         )
+        .arg(
+            Arg::with_name("insensitive")
+                .short("i")
+                .long("insensitive")
+                .help("Case insensitive search")
+                .takes_value(false),
+        )
         .get_matches();
 
-    let string = matches.value_of("string").unwrap();
+    let mut string = String::from(matches.value_of("string").unwrap());
     let path = matches.value_of("path").unwrap();
 
     let config = Config {
         recursive: matches.is_present("recursive"),
         location: matches.is_present("location"),
         followlinks: matches.is_present("followlinks"),
+        insensitive: matches.is_present("insensitive"),
     };
 
     let path = Path::new(path);
-    search(&config, string, path, true);
+    if config.insensitive {
+        string = string.to_lowercase();
+    }
+    search(&config, &string, path, true);
 }

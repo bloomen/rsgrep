@@ -7,6 +7,7 @@ pub struct Config {
     pub recursive: bool,
     pub location: bool,
     pub followlinks: bool,
+    pub insensitive: bool,
 }
 
 fn path_to_string(path: &Path) -> String {
@@ -48,7 +49,15 @@ pub fn search_file(config: &Config, string: &str, path: &Path) {
             for (i, line) in reader.lines().enumerate() {
                 match line {
                     Ok(line) => {
-                        if line.contains(string) {
+                        if config.insensitive {
+                            if line.to_lowercase().contains(string) {
+                                if config.location {
+                                    println!("[{}:{}]{}", filename, i + 1, line);
+                                } else {
+                                    println!("{}", line);
+                                }
+                            }
+                        } else if line.contains(string) {
                             if config.location {
                                 println!("[{}:{}]{}", filename, i + 1, line);
                             } else {
