@@ -7,7 +7,7 @@ use rsgrep::*;
 
 fn main() {
     let matches = App::new("rsgrep")
-        .version("0.3.0")
+        .version("0.4.0")
         .about("A simple version of grep implemented in Rust")
         .author("Christian Blume")
         .arg(
@@ -24,21 +24,21 @@ fn main() {
             Arg::with_name("recursive")
                 .short("r")
                 .long("recursive")
-                .help("Whether to search directories recursively")
+                .help("Search directories recursively")
                 .takes_value(false),
         )
         .arg(
             Arg::with_name("location")
                 .short("l")
                 .long("location")
-                .help("Whether to print filename and line number")
+                .help("Print filename and line number")
                 .takes_value(false),
         )
         .arg(
             Arg::with_name("followlinks")
                 .short("f")
                 .long("followlinks")
-                .help("Whether to follow links")
+                .help("Follow links")
                 .takes_value(false),
         )
         .get_matches();
@@ -53,5 +53,5 @@ fn main() {
     };
 
     let path = Path::new(path);
-    search(&config, string, path);
+    search(&config, string, path, true);
 }

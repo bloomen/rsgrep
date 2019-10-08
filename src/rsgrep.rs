@@ -1,7 +1,7 @@
-use std::path::{Path, PathBuf};
 use std::fs;
 use std::io;
 use std::io::prelude::*;
+use std::path::{Path, PathBuf};
 
 pub struct Config {
     pub recursive: bool,
@@ -30,12 +30,8 @@ fn resolve_path(config: &Config, path: &Path) -> Option<PathBuf> {
         Some(p)
     } else {
         match fs::read_link(path) {
-            Ok(_) => {
-                None
-            }
-            Err(_) => {
-                Some(path.to_path_buf())
-            }
+            Ok(_) => None,
+            Err(_) => Some(path.to_path_buf()),
         }
     }
 }
@@ -84,7 +80,7 @@ pub fn search_dir(config: &Config, string: &str, dir: &Path) {
                 match entry {
                     Ok(entry) => {
                         let path = entry.path();
-                        search(&config, string, &path);
+                        search(&config, string, &path, false);
                     }
                     Err(err) => {
                         println!(
@@ -106,7 +102,7 @@ pub fn search_dir(config: &Config, string: &str, dir: &Path) {
     }
 }
 
-pub fn search(config: &Config, string: &str, path: &Path) {
+pub fn search(config: &Config, string: &str, path: &Path, initial: bool) {
     if !path.exists() {
         println!("Error: Path does not exist: {}", path_to_string(path));
         return;
@@ -116,7 +112,9 @@ pub fn search(config: &Config, string: &str, path: &Path) {
             if path.is_file() {
                 search_file(&config, string, &path);
             } else if path.is_dir() {
-                search_dir(&config, string, &path);
+                if initial || config.recursive {
+                    search_dir(&config, string, &path);
+                }
             } else {
                 panic!("Neither file nor directory: {}", path_to_string(&path));
             }
