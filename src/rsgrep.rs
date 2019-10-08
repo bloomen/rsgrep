@@ -8,6 +8,7 @@ pub struct Config {
     pub location: bool,
     pub followlinks: bool,
     pub insensitive: bool,
+    pub warnings: bool,
 }
 
 fn path_to_string(path: &Path) -> String {
@@ -39,7 +40,10 @@ fn resolve_path(config: &Config, path: &Path) -> Option<PathBuf> {
 
 pub fn search_file(config: &Config, string: &str, path: &Path) {
     if !path.exists() {
-        println!("Error: Path does not exist: {}", path_to_string(path));
+        println!(
+            "<rsgrep> Error: Path does not exist: {}",
+            path_to_string(path)
+        );
         return;
     }
     let filename = path_to_string(path);
@@ -66,21 +70,24 @@ pub fn search_file(config: &Config, string: &str, path: &Path) {
                         }
                     }
                     Err(err) => {
-                        println!("Error: Reading from file ({}): {}", err, filename);
+                        println!("<rsgrep> Error: Reading from file ({}): {}", err, filename);
                         break;
                     }
                 }
             }
         }
         Err(err) => {
-            println!("Error: Cannot open file ({}): {}", err, filename);
+            println!("<rsgrep> Error: Cannot open file ({}): {}", err, filename);
         }
     }
 }
 
 pub fn search_dir(config: &Config, string: &str, dir: &Path) {
     if !dir.exists() {
-        println!("Error: Path does not exist: {}", path_to_string(dir));
+        println!(
+            "<rsgrep> Error: Path does not exist: {}",
+            path_to_string(dir)
+        );
         return;
     }
     match fs::read_dir(dir) {
@@ -93,7 +100,7 @@ pub fn search_dir(config: &Config, string: &str, dir: &Path) {
                     }
                     Err(err) => {
                         println!(
-                            "Error: Iterating directory ({}): {}",
+                            "<rsgrep> Error: Iterating directory ({}): {}",
                             err,
                             path_to_string(dir)
                         );
@@ -103,7 +110,7 @@ pub fn search_dir(config: &Config, string: &str, dir: &Path) {
         }
         Err(err) => {
             println!(
-                "Error: Cannot iterate directory ({}): {}",
+                "<rsgrep> Error: Cannot iterate directory ({}): {}",
                 err,
                 path_to_string(dir)
             );
@@ -113,7 +120,10 @@ pub fn search_dir(config: &Config, string: &str, dir: &Path) {
 
 pub fn search(config: &Config, string: &str, path: &Path, initial: bool) {
     if !path.exists() {
-        println!("Error: Path does not exist: {}", path_to_string(path));
+        println!(
+            "<rsgrep> Error: Path does not exist: {}",
+            path_to_string(path)
+        );
         return;
     }
     match resolve_path(&config, path) {
@@ -125,11 +135,16 @@ pub fn search(config: &Config, string: &str, path: &Path, initial: bool) {
                     search_dir(&config, string, &path);
                 }
             } else {
-                panic!("Neither file nor directory: {}", path_to_string(&path));
+                println!(
+                    "<rsgrep> Error: Cannot open path: {}",
+                    path_to_string(&path)
+                );
             }
         }
         None => {
-            println!("Warning: Ignoring path: {}", path_to_string(path));
+            if config.warnings {
+                println!("<rsgrep> Warning: Ignoring path: {}", path_to_string(path));
+            }
         }
     }
 }

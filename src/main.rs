@@ -48,6 +48,13 @@ fn main() {
                 .help("Case insensitive search")
                 .takes_value(false),
         )
+        .arg(
+            Arg::with_name("warnings")
+                .short("w")
+                .long("warnings")
+                .help("Show warnings")
+                .takes_value(false),
+        )
         .get_matches();
 
     let mut string = String::from(matches.value_of("string").unwrap());
@@ -58,6 +65,7 @@ fn main() {
         location: matches.is_present("location"),
         followlinks: matches.is_present("followlinks"),
         insensitive: matches.is_present("insensitive"),
+        warnings: matches.is_present("warnings"),
     };
 
     let path = Path::new(path);
