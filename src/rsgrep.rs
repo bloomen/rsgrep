@@ -18,40 +18,36 @@ fn path_to_string(path: &Path) -> String {
     }
 }
 
-fn resolve_link(path: &mut PathBuf) {
-    if let Ok(p) = fs::read_link(&path) {
-        if p.is_absolute() {
-            *path = p.to_path_buf();
-        } else {
-            let mut new_path = PathBuf::new();
-            match path.parent() {
-                Some(parent) => {
-                    new_path.push(parent);
-                }
-                None => {
-                    panic!(
-                        "No parent found for link: {}",
-                        path.as_os_str().to_str().unwrap()
-                    );
-                }
-            }
-            new_path.push(p);
-            *path = new_path;
+fn canonicalize(path: &Path) -> Option<PathBuf> {
+    match path.canonicalize() {
+        Ok(p) => Some(p),
+        Err(err) => {
+            println!(
+                "<rsgrep> Error: Cannot resolve path ({}): {}",
+                err,
+                path_to_string(path)
+            );
+            None
         }
-        resolve_link(path);
     }
 }
 
 fn resolve_path(config: &Config, path: &Path) -> Option<PathBuf> {
     if config.followlinks {
-        let mut p = path.to_path_buf();
-        resolve_link(&mut p);
-        Some(p)
+        canonicalize(path)
     } else {
         match fs::read_link(path) {
             Ok(_) => None,
-            Err(_) => Some(path.to_path_buf()),
+            Err(_) => canonicalize(path),
         }
+    }
+}
+
+fn print_line(config: &Config, filename: &str, i: usize, line: &str) {
+    if config.location {
+        println!("[{}:{}]{}", filename, i + 1, line);
+    } else {
+        println!("{}", line);
     }
 }
 
@@ -72,18 +68,10 @@ fn search_file(config: &Config, string: &str, path: &Path) {
                     Ok(line) => {
                         if config.insensitive {
                             if line.to_lowercase().contains(string) {
-                                if config.location {
-                                    println!("[{}:{}]{}", filename, i + 1, line);
-                                } else {
-                                    println!("{}", line);
-                                }
+                                print_line(config, &filename, i + 1, &line);
                             }
                         } else if line.contains(string) {
-                            if config.location {
-                                println!("[{}:{}]{}", filename, i + 1, line);
-                            } else {
-                                println!("{}", line);
-                            }
+                            print_line(config, &filename, i + 1, &line);
                         }
                     }
                     Err(err) => {
