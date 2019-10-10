@@ -20,7 +20,24 @@ fn path_to_string(path: &Path) -> String {
 
 fn resolve_link(path: &mut PathBuf) {
     if let Ok(p) = fs::read_link(&path) {
-        *path = p.to_path_buf();
+        if p.is_absolute() {
+            *path = p.to_path_buf();
+        } else {
+            let mut new_path = PathBuf::new();
+            match path.parent() {
+                Some(parent) => {
+                    new_path.push(parent);
+                }
+                None => {
+                    panic!(
+                        "No parent found for link: {}",
+                        path.as_os_str().to_str().unwrap()
+                    );
+                }
+            }
+            new_path.push(p);
+            *path = new_path;
+        }
         resolve_link(path);
     }
 }
