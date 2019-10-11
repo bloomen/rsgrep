@@ -60,6 +60,16 @@ fn print_line(config: &Config, filename: &str, i: usize, line: &str) {
     }
 }
 
+fn is_binary(file: &mut fs::File) -> bool {
+    let mut buffer: Vec<u8> = vec![];
+    if file.take(1024 as u64).read_to_end(&mut buffer).is_ok() {
+        let content_type = content_inspector::inspect(&buffer);
+        content_type == content_inspector::ContentType::BINARY
+    } else {
+        false
+    }
+}
+
 fn search_file(config: &Config, string: &str, path: &Path) {
     if !path.exists() {
         println!(
@@ -70,7 +80,17 @@ fn search_file(config: &Config, string: &str, path: &Path) {
     }
     let filename = path_to_string(config, path);
     match fs::File::open(path) {
-        Ok(file) => {
+        Ok(mut file) => {
+            if is_binary(&mut file) {
+                if config.warnings {
+                    println!("<rsgrep> Warning: Ignoring binary file: {}", path_to_string(&config, path));
+                }
+                return
+            }
+            if let Err(err) = file.seek(io::SeekFrom::Start(0)) {
+                println!("<rsgrep> Error: Cannot seek in file ({}): {}", err, filename);
+                return
+            };
             let reader = io::BufReader::new(file);
             for (i, line) in reader.lines().enumerate() {
                 match line {
@@ -84,7 +104,9 @@ fn search_file(config: &Config, string: &str, path: &Path) {
                         }
                     }
                     Err(err) => {
-                        println!("<rsgrep> Error: Reading from file ({}): {}", err, filename);
+                        if config.warnings {
+                            println!("<rsgrep> Warning: Problem reading from file ({}): {}", err, filename);
+                        }
                         break;
                     }
                 }

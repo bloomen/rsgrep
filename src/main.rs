@@ -1,4 +1,5 @@
 extern crate clap;
+extern crate content_inspector;
 use clap::{App, Arg};
 use std::path::{Path, PathBuf};
 use std::env;
