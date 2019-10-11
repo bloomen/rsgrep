@@ -4,28 +4,37 @@ use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 
 pub struct Config {
+    pub cwd: PathBuf,
     pub recursive: bool,
     pub location: bool,
     pub followlinks: bool,
     pub insensitive: bool,
     pub warnings: bool,
+    pub relative: bool,
 }
 
-fn path_to_string(path: &Path) -> String {
-    match path.to_str() {
-        Some(name) => String::from(name),
-        None => String::from("<None>"),
+fn path_to_string(config: &Config, path: &Path) -> String {
+    if config.relative {
+        match path.strip_prefix(&config.cwd).unwrap().to_str() {
+            Some(name) => String::from(name),
+            None => String::from("<None>"),
+        }
+    } else {
+        match path.to_str() {
+            Some(name) => String::from(name),
+            None => String::from("<None>"),
+        }
     }
 }
 
-fn canonicalize(path: &Path) -> Option<PathBuf> {
+fn canonicalize(config: &Config, path: &Path) -> Option<PathBuf> {
     match path.canonicalize() {
         Ok(p) => Some(p),
         Err(err) => {
             println!(
                 "<rsgrep> Error: Cannot resolve path ({}): {}",
                 err,
-                path_to_string(path)
+                path_to_string(config, path)
             );
             None
         }
@@ -34,11 +43,11 @@ fn canonicalize(path: &Path) -> Option<PathBuf> {
 
 fn resolve_path(config: &Config, path: &Path) -> Option<PathBuf> {
     if config.followlinks {
-        canonicalize(path)
+        canonicalize(config, path)
     } else {
         match fs::read_link(path) {
             Ok(_) => None,
-            Err(_) => canonicalize(path),
+            Err(_) => canonicalize(config, path),
         }
     }
 }
@@ -55,11 +64,11 @@ fn search_file(config: &Config, string: &str, path: &Path) {
     if !path.exists() {
         println!(
             "<rsgrep> Error: Path does not exist: {}",
-            path_to_string(path)
+            path_to_string(config, path)
         );
         return;
     }
-    let filename = path_to_string(path);
+    let filename = path_to_string(config, path);
     match fs::File::open(path) {
         Ok(file) => {
             let reader = io::BufReader::new(file);
@@ -91,7 +100,7 @@ fn search_dir(config: &Config, string: &str, dir: &Path) {
     if !dir.exists() {
         println!(
             "<rsgrep> Error: Path does not exist: {}",
-            path_to_string(dir)
+            path_to_string(config, dir)
         );
         return;
     }
@@ -107,7 +116,7 @@ fn search_dir(config: &Config, string: &str, dir: &Path) {
                         println!(
                             "<rsgrep> Error: Iterating directory ({}): {}",
                             err,
-                            path_to_string(dir)
+                            path_to_string(config, dir)
                         );
                     }
                 }
@@ -117,7 +126,7 @@ fn search_dir(config: &Config, string: &str, dir: &Path) {
             println!(
                 "<rsgrep> Error: Cannot iterate directory ({}): {}",
                 err,
-                path_to_string(dir)
+                path_to_string(config, dir)
             );
         }
     }
@@ -127,7 +136,7 @@ pub fn search(config: &Config, string: &str, path: &Path, initial: bool) {
     if !path.exists() {
         println!(
             "<rsgrep> Error: Path does not exist: {}",
-            path_to_string(path)
+            path_to_string(config, path)
         );
         return;
     }
@@ -142,13 +151,13 @@ pub fn search(config: &Config, string: &str, path: &Path, initial: bool) {
             } else {
                 println!(
                     "<rsgrep> Error: Cannot open path: {}",
-                    path_to_string(&path)
+                    path_to_string(config, &path)
                 );
             }
         }
         None => {
             if config.warnings {
-                println!("<rsgrep> Warning: Ignoring path: {}", path_to_string(path));
+                println!("<rsgrep> Warning: Ignoring path: {}", path_to_string(config, path));
             }
         }
     }
