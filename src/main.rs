@@ -70,6 +70,13 @@ fn main() {
                 .help("Interpret the search string as a regular expression")
                 .takes_value(false),
         )
+        .arg(
+            Arg::with_name("color")
+                .short("c")
+                .long("color")
+                .help("Output colored strings")
+                .takes_value(false),
+        )
         .get_matches();
 
     let mut string = String::from(matches.value_of("string").unwrap());
@@ -113,6 +120,7 @@ fn main() {
         warnings: matches.is_present("warnings"),
         relative: matches.is_present("relative"),
         regex,
+        color: matches.is_present("color"),
     };
 
     let path = Path::new(path);

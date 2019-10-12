@@ -13,6 +13,7 @@ pub struct Config {
     pub warnings: bool,
     pub relative: bool,
     pub regex: Option<Regex>,
+    pub color: bool,
 }
 
 fn path_to_string(config: &Config, path: &Path) -> String {
