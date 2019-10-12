@@ -76,13 +76,13 @@ fn is_binary(file: &mut fs::File) -> bool {
 fn matches(config: &Config, string: &str, line: &str) -> bool {
     match &config.regex {
         Some(re) => {
-            return re.is_match(line);
+            re.is_match(line)
         }
         None => {
             if config.insensitive {
-                return line.to_lowercase().contains(string);
+                line.to_lowercase().contains(string)
             } else {
-                return line.contains(string);
+                line.contains(string)
             }
         }
     }
