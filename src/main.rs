@@ -95,7 +95,7 @@ fn main() {
         }
     }
 
-    let mut regex: Option<Regex> = None;
+    let mut regex = None;
     if matches.is_present("regex") {
         match Regex::new(&string) {
             Ok(re) => {
