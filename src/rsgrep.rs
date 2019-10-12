@@ -2,6 +2,7 @@ use std::fs;
 use std::io;
 use std::io::prelude::*;
 use std::path::{Path, PathBuf};
+use regex::Regex;
 
 pub struct Config {
     pub cwd: PathBuf,
@@ -11,6 +12,7 @@ pub struct Config {
     pub insensitive: bool,
     pub warnings: bool,
     pub relative: bool,
+    pub regex: Option<Regex>,
 }
 
 fn path_to_string(config: &Config, path: &Path) -> String {
@@ -70,6 +72,21 @@ fn is_binary(file: &mut fs::File) -> bool {
     }
 }
 
+fn matches(config: &Config, string: &str, line: &str) -> bool {
+    match &config.regex {
+        Some(re) => {
+            return re.is_match(line);
+        }
+        None => {
+            if config.insensitive {
+                return line.to_lowercase().contains(string);
+            } else {
+                return line.contains(string);
+            }
+        }
+    }
+}
+
 fn search_file(config: &Config, string: &str, path: &Path) {
     if !path.exists() {
         println!(
@@ -95,11 +112,7 @@ fn search_file(config: &Config, string: &str, path: &Path) {
             for (i, line) in reader.lines().enumerate() {
                 match line {
                     Ok(line) => {
-                        if config.insensitive {
-                            if line.to_lowercase().contains(string) {
-                                print_line(config, &filename, i + 1, &line);
-                            }
-                        } else if line.contains(string) {
+                        if matches(&config, string, &line) {
                             print_line(config, &filename, i + 1, &line);
                         }
                     }

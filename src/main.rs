@@ -1,8 +1,7 @@
-extern crate clap;
-extern crate content_inspector;
 use clap::{App, Arg};
-use std::path::{Path, PathBuf};
+use regex::Regex;
 use std::env;
+use std::path::{Path, PathBuf};
 
 mod rsgrep;
 use rsgrep::*;
@@ -64,6 +63,13 @@ fn main() {
                 .help("Print relative filenames")
                 .takes_value(false),
         )
+        .arg(
+            Arg::with_name("regex")
+                .short("e")
+                .long("regex")
+                .help("Interpret the search string as a regular expression")
+                .takes_value(false),
+        )
         .get_matches();
 
     let mut string = String::from(matches.value_of("string").unwrap());
@@ -75,7 +81,26 @@ fn main() {
             current_dir.push(p);
         }
         Err(err) => {
-            println!("<rsgrep> Error: Unable to determine current working directory ({})", err);
+            println!(
+                "<rsgrep> Error: Unable to determine current working directory ({})",
+                err
+            );
+        }
+    }
+
+    let mut regex: Option<Regex> = None;
+    if matches.is_present("regex") {
+        match Regex::new(&string) {
+            Ok(re) => {
+                regex = Some(re);
+            }
+            Err(err) => {
+                println!(
+                    "<rsgrep> Error: Unable to parse regular expression ({}): {}",
+                    err, string
+                );
+                return;
+            }
         }
     }
 
@@ -84,9 +109,10 @@ fn main() {
         recursive: matches.is_present("recursive"),
         location: matches.is_present("location"),
         followlinks: matches.is_present("followlinks"),
-        insensitive: matches.is_present("insensitive"),
+        insensitive: matches.is_present("insensitive") && regex.is_none(),
         warnings: matches.is_present("warnings"),
         relative: matches.is_present("relative"),
+        regex,
     };
 
     let path = Path::new(path);

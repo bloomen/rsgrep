@@ -13,3 +13,4 @@ readme = "README.md"
 [dependencies]
 clap = "2.33.0"
 content_inspector = "0.2.4"
+regex = "1"
