@@ -93,8 +93,7 @@ fn main() {
 
     let mut output = Output {
         color,
-        path_color: tc::ColorSpec::new().set_fg(Some(tc::Color::Blue)).clone(),
-        line_color: tc::ColorSpec::new().set_fg(Some(tc::Color::Blue)).clone(),
+        loc_color: tc::ColorSpec::new().set_fg(Some(tc::Color::Cyan)).clone(),
         warn_color: tc::ColorSpec::new().set_fg(Some(tc::Color::Yellow)).clone(),
         err_color: tc::ColorSpec::new().set_fg(Some(tc::Color::Red)).clone(),
         stdout: tc::StandardStream::stdout(color_choice),

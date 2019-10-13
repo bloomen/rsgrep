@@ -19,12 +19,35 @@ pub struct Config {
 
 pub struct Output {
     pub color: bool,
-    pub path_color: tc::ColorSpec,
-    pub line_color: tc::ColorSpec,
+    pub loc_color: tc::ColorSpec,
     pub warn_color: tc::ColorSpec,
     pub err_color: tc::ColorSpec,
     pub stdout: tc::StandardStream,
     pub stderr: tc::StandardStream,
+}
+
+pub struct LocWriter<'a> {
+    output: &'a mut Output,
+}
+
+impl<'a> LocWriter<'a> {
+    pub fn new(output: &mut Output) -> LocWriter {
+        if output.color {
+            output.stdout.set_color(&output.loc_color).unwrap();
+        }
+        LocWriter { output }
+    }
+    pub fn stream(&mut self) -> &mut tc::StandardStream {
+        &mut self.output.stdout
+    }
+}
+
+impl<'a> Drop for LocWriter<'a> {
+    fn drop(&mut self) {
+        if self.output.color {
+            self.output.stdout.reset().unwrap();
+        }
+    }
 }
 
 pub struct ErrWriter<'a> {
@@ -117,12 +140,16 @@ fn resolve_path(config: &Config, mut output: &mut Output, path: &Path) -> Option
     }
 }
 
-fn print_line(config: &Config, filename: &str, i: usize, line: &str) {
+fn print_line(config: &Config, mut output: &mut Output, filename: &str, i: usize, line: &str) {
     if config.location {
-        println!("[{}:{}]{}", filename, i + 1, line);
-    } else {
-        println!("{}", line);
+        let mut loc_writer = LocWriter::new(&mut output);
+        write!(
+            &mut loc_writer.stream(),
+            "{}:{}:",
+            filename, i + 1
+        ).unwrap();
     }
+    println!("{}", line);
 }
 
 fn is_binary(file: &mut fs::File) -> bool {
@@ -190,7 +217,7 @@ fn search_file(config: &Config, mut output: &mut Output, string: &str, path: &Pa
                 match line {
                     Ok(line) => {
                         if matches(&config, string, &line) {
-                            print_line(config, &filename, i + 1, &line);
+                            print_line(config, &mut output, &filename, i + 1, &line);
                         }
                     }
                     Err(err) => {
