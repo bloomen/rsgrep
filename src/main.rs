@@ -1,7 +1,9 @@
 use clap::{App, Arg};
 use regex::Regex;
 use std::env;
+use std::io::prelude::*;
 use std::path::{Path, PathBuf};
+use termcolor as tc;
 
 mod rsgrep;
 use rsgrep::*;
@@ -81,6 +83,23 @@ fn main() {
 
     let mut string = String::from(matches.value_of("string").unwrap());
     let path = matches.value_of("path").unwrap();
+    let color = matches.is_present("color");
+
+    let color_choice = if color {
+        tc::ColorChoice::Always
+    } else {
+        tc::ColorChoice::Never
+    };
+
+    let mut output = Output {
+        color,
+        path_color: tc::ColorSpec::new().set_fg(Some(tc::Color::Blue)).clone(),
+        line_color: tc::ColorSpec::new().set_fg(Some(tc::Color::Blue)).clone(),
+        warn_color: tc::ColorSpec::new().set_fg(Some(tc::Color::Yellow)).clone(),
+        err_color: tc::ColorSpec::new().set_fg(Some(tc::Color::Red)).clone(),
+        stdout: tc::StandardStream::stdout(color_choice),
+        stderr: tc::StandardStream::stderr(color_choice),
+    };
 
     let mut current_dir = PathBuf::new();
     match env::current_dir() {
@@ -88,10 +107,13 @@ fn main() {
             current_dir.push(p);
         }
         Err(err) => {
-            println!(
+            let mut err_writer = ErrWriter::new(&mut output);
+            writeln!(
+                &mut err_writer.stream(),
                 "<rsgrep> Error: Unable to determine current working directory ({})",
                 err
-            );
+            )
+            .unwrap();
         }
     }
 
@@ -102,10 +124,14 @@ fn main() {
                 regex = Some(re);
             }
             Err(err) => {
-                println!(
+                let mut err_writer = ErrWriter::new(&mut output);
+                writeln!(
+                    &mut err_writer.stream(),
                     "<rsgrep> Error: Unable to parse regular expression ({}): {}",
-                    err, string
-                );
+                    err,
+                    string
+                )
+                .unwrap();
                 return;
             }
         }
@@ -120,12 +146,12 @@ fn main() {
         warnings: matches.is_present("warnings"),
         relative: matches.is_present("relative"),
         regex,
-        color: matches.is_present("color"),
     };
 
     let path = Path::new(path);
     if config.insensitive {
         string = string.to_lowercase();
     }
-    search(&config, &string, path, true);
+
+    search(&config, &mut output, &string, path, true);
 }

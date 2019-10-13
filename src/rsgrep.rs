@@ -1,8 +1,10 @@
+use regex::Regex;
 use std::fs;
 use std::io;
 use std::io::prelude::*;
 use std::path::{Path, PathBuf};
-use regex::Regex;
+use tc::WriteColor;
+use termcolor as tc;
 
 pub struct Config {
     pub cwd: PathBuf,
@@ -13,7 +15,64 @@ pub struct Config {
     pub warnings: bool,
     pub relative: bool,
     pub regex: Option<Regex>,
+}
+
+pub struct Output {
     pub color: bool,
+    pub path_color: tc::ColorSpec,
+    pub line_color: tc::ColorSpec,
+    pub warn_color: tc::ColorSpec,
+    pub err_color: tc::ColorSpec,
+    pub stdout: tc::StandardStream,
+    pub stderr: tc::StandardStream,
+}
+
+pub struct ErrWriter<'a> {
+    output: &'a mut Output,
+}
+
+impl<'a> ErrWriter<'a> {
+    pub fn new(output: &mut Output) -> ErrWriter {
+        if output.color {
+            output.stderr.set_color(&output.err_color).unwrap();
+        }
+        ErrWriter { output }
+    }
+    pub fn stream(&mut self) -> &mut tc::StandardStream {
+        &mut self.output.stderr
+    }
+}
+
+impl<'a> Drop for ErrWriter<'a> {
+    fn drop(&mut self) {
+        if self.output.color {
+            self.output.stderr.reset().unwrap();
+        }
+    }
+}
+
+pub struct WarnWriter<'a> {
+    output: &'a mut Output,
+}
+
+impl<'a> WarnWriter<'a> {
+    pub fn new(output: &mut Output) -> WarnWriter {
+        if output.color {
+            output.stderr.set_color(&output.warn_color).unwrap();
+        }
+        WarnWriter { output }
+    }
+    pub fn stream(&mut self) -> &mut tc::StandardStream {
+        &mut self.output.stderr
+    }
+}
+
+impl<'a> Drop for WarnWriter<'a> {
+    fn drop(&mut self) {
+        if self.output.color {
+            self.output.stderr.reset().unwrap();
+        }
+    }
 }
 
 fn path_to_string(config: &Config, path: &Path) -> String {
@@ -30,27 +89,30 @@ fn path_to_string(config: &Config, path: &Path) -> String {
     }
 }
 
-fn canonicalize(config: &Config, path: &Path) -> Option<PathBuf> {
+fn canonicalize(config: &Config, mut output: &mut Output, path: &Path) -> Option<PathBuf> {
     match path.canonicalize() {
         Ok(p) => Some(p),
         Err(err) => {
-            println!(
+            let mut err_writer = ErrWriter::new(&mut output);
+            writeln!(
+                &mut err_writer.stream(),
                 "<rsgrep> Error: Cannot resolve path ({}): {}",
                 err,
                 path_to_string(config, path)
-            );
+            )
+            .unwrap();
             None
         }
     }
 }
 
-fn resolve_path(config: &Config, path: &Path) -> Option<PathBuf> {
+fn resolve_path(config: &Config, mut output: &mut Output, path: &Path) -> Option<PathBuf> {
     if config.followlinks {
-        canonicalize(config, path)
+        canonicalize(config, &mut output, path)
     } else {
         match fs::read_link(path) {
             Ok(_) => None,
-            Err(_) => canonicalize(config, path),
+            Err(_) => canonicalize(config, &mut output, path),
         }
     }
 }
@@ -75,9 +137,7 @@ fn is_binary(file: &mut fs::File) -> bool {
 
 fn matches(config: &Config, string: &str, line: &str) -> bool {
     match &config.regex {
-        Some(re) => {
-            re.is_match(line)
-        }
+        Some(re) => re.is_match(line),
         None => {
             if config.insensitive {
                 line.to_lowercase().contains(string)
@@ -88,12 +148,15 @@ fn matches(config: &Config, string: &str, line: &str) -> bool {
     }
 }
 
-fn search_file(config: &Config, string: &str, path: &Path) {
+fn search_file(config: &Config, mut output: &mut Output, string: &str, path: &Path) {
     if !path.exists() {
-        println!(
+        let mut err_writer = ErrWriter::new(&mut output);
+        writeln!(
+            &mut err_writer.stream(),
             "<rsgrep> Error: Path does not exist: {}",
             path_to_string(config, path)
-        );
+        )
+        .unwrap();
         return;
     }
     let filename = path_to_string(config, path);
@@ -101,13 +164,26 @@ fn search_file(config: &Config, string: &str, path: &Path) {
         Ok(mut file) => {
             if is_binary(&mut file) {
                 if config.warnings {
-                    println!("<rsgrep> Warning: Ignoring binary file: {}", path_to_string(&config, path));
+                    let mut warn_writer = WarnWriter::new(&mut output);
+                    writeln!(
+                        &mut warn_writer.stream(),
+                        "<rsgrep> Warning: Ignoring binary file: {}",
+                        path_to_string(&config, path)
+                    )
+                    .unwrap();
                 }
-                return
+                return;
             }
             if let Err(err) = file.seek(io::SeekFrom::Start(0)) {
-                println!("<rsgrep> Error: Cannot seek in file ({}): {}", err, filename);
-                return
+                let mut err_writer = ErrWriter::new(&mut output);
+                writeln!(
+                    &mut err_writer.stream(),
+                    "<rsgrep> Error: Cannot seek in file ({}): {}",
+                    err,
+                    filename
+                )
+                .unwrap();
+                return;
             };
             let reader = io::BufReader::new(file);
             for (i, line) in reader.lines().enumerate() {
@@ -119,7 +195,14 @@ fn search_file(config: &Config, string: &str, path: &Path) {
                     }
                     Err(err) => {
                         if config.warnings {
-                            println!("<rsgrep> Warning: Problem reading from file ({}): {}", err, filename);
+                            let mut warn_writer = WarnWriter::new(&mut output);
+                            writeln!(
+                                &mut warn_writer.stream(),
+                                "<rsgrep> Warning: Problem reading from file ({}): {}",
+                                err,
+                                filename
+                            )
+                            .unwrap();
                         }
                         break;
                     }
@@ -127,17 +210,27 @@ fn search_file(config: &Config, string: &str, path: &Path) {
             }
         }
         Err(err) => {
-            println!("<rsgrep> Error: Cannot open file ({}): {}", err, filename);
+            let mut err_writer = ErrWriter::new(&mut output);
+            writeln!(
+                &mut err_writer.stream(),
+                "<rsgrep> Error: Cannot open file ({}): {}",
+                err,
+                filename
+            )
+            .unwrap();
         }
     }
 }
 
-fn search_dir(config: &Config, string: &str, dir: &Path) {
+fn search_dir(config: &Config, mut output: &mut Output, string: &str, dir: &Path) {
     if !dir.exists() {
-        println!(
+        let mut err_writer = ErrWriter::new(&mut output);
+        writeln!(
+            &mut err_writer.stream(),
             "<rsgrep> Error: Path does not exist: {}",
             path_to_string(config, dir)
-        );
+        )
+        .unwrap();
         return;
     }
     match fs::read_dir(dir) {
@@ -146,54 +239,72 @@ fn search_dir(config: &Config, string: &str, dir: &Path) {
                 match entry {
                     Ok(entry) => {
                         let path = entry.path();
-                        search(&config, string, &path, false);
+                        search(&config, &mut output, string, &path, false);
                     }
                     Err(err) => {
-                        println!(
+                        let mut err_writer = ErrWriter::new(&mut output);
+                        writeln!(
+                            &mut err_writer.stream(),
                             "<rsgrep> Error: Iterating directory ({}): {}",
                             err,
                             path_to_string(config, dir)
-                        );
+                        )
+                        .unwrap();
                     }
                 }
             }
         }
         Err(err) => {
-            println!(
+            let mut err_writer = ErrWriter::new(&mut output);
+            writeln!(
+                &mut err_writer.stream(),
                 "<rsgrep> Error: Cannot iterate directory ({}): {}",
                 err,
                 path_to_string(config, dir)
-            );
+            )
+            .unwrap();
         }
     }
 }
 
-pub fn search(config: &Config, string: &str, path: &Path, initial: bool) {
+pub fn search(config: &Config, mut output: &mut Output, string: &str, path: &Path, initial: bool) {
     if !path.exists() {
-        println!(
+        let mut err_writer = ErrWriter::new(&mut output);
+        writeln!(
+            &mut err_writer.stream(),
             "<rsgrep> Error: Path does not exist: {}",
             path_to_string(config, path)
-        );
+        )
+        .unwrap();
         return;
     }
-    match resolve_path(&config, path) {
+    match resolve_path(&config, &mut output, path) {
         Some(path) => {
             if path.is_file() {
-                search_file(&config, string, &path);
+                search_file(&config, &mut output, string, &path);
             } else if path.is_dir() {
                 if initial || config.recursive {
-                    search_dir(&config, string, &path);
+                    search_dir(&config, &mut output, string, &path);
                 }
             } else {
-                println!(
+                let mut err_writer = ErrWriter::new(&mut output);
+                writeln!(
+                    &mut err_writer.stream(),
                     "<rsgrep> Error: Cannot open path: {}",
                     path_to_string(config, &path)
-                );
+                )
+                .unwrap();
             }
         }
         None => {
             if config.warnings {
-                println!("<rsgrep> Warning: Ignoring path: {}", path_to_string(config, path));
+                let mut warn_writer = WarnWriter::new(&mut output);
+                writeln!(
+                    &mut warn_writer.stream(),
+                    "<rsgrep> Warning: Ignoring path: {}",
+                    path_to_string(config, path)
+                )
+                .unwrap();
             }
         }
     }
