@@ -26,7 +26,7 @@ pub struct Output {
     pub stderr: tc::StandardStream,
 }
 
-pub trait Writer : Drop {
+pub trait Writer: Drop {
     fn stream(&mut self) -> &mut tc::StandardStream;
 }
 
@@ -156,11 +156,7 @@ fn resolve_path(config: &Config, mut output: &mut Output, path: &Path) -> Option
 fn print_line(config: &Config, mut output: &mut Output, filename: &str, i: usize, line: &str) {
     if config.location {
         let mut loc_writer = LocWriter::new(&mut output);
-        write!(
-            &mut loc_writer.stream(),
-            "{}:{}:",
-            filename, i + 1
-        ).unwrap();
+        write!(&mut loc_writer.stream(), "{}:{}:", filename, i + 1).unwrap();
     }
     println!("{}", line);
 }
