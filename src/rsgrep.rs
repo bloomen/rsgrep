@@ -26,7 +26,11 @@ pub struct Output {
     pub stderr: tc::StandardStream,
 }
 
-pub struct LocWriter<'a> {
+pub trait Writer : Drop {
+    fn stream(&mut self) -> &mut tc::StandardStream;
+}
+
+struct LocWriter<'a> {
     output: &'a mut Output,
 }
 
@@ -37,7 +41,10 @@ impl<'a> LocWriter<'a> {
         }
         LocWriter { output }
     }
-    pub fn stream(&mut self) -> &mut tc::StandardStream {
+}
+
+impl<'a> Writer for LocWriter<'a> {
+    fn stream(&mut self) -> &mut tc::StandardStream {
         &mut self.output.stdout
     }
 }
@@ -61,7 +68,10 @@ impl<'a> ErrWriter<'a> {
         }
         ErrWriter { output }
     }
-    pub fn stream(&mut self) -> &mut tc::StandardStream {
+}
+
+impl<'a> Writer for ErrWriter<'a> {
+    fn stream(&mut self) -> &mut tc::StandardStream {
         &mut self.output.stderr
     }
 }
@@ -85,7 +95,10 @@ impl<'a> WarnWriter<'a> {
         }
         WarnWriter { output }
     }
-    pub fn stream(&mut self) -> &mut tc::StandardStream {
+}
+
+impl<'a> Writer for WarnWriter<'a> {
+    fn stream(&mut self) -> &mut tc::StandardStream {
         &mut self.output.stderr
     }
 }
