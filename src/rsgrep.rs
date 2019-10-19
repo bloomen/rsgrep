@@ -26,6 +26,11 @@ pub struct Output {
     pub stderr: tc::StandardStream,
 }
 
+pub struct Buffer {
+    pub binary: Vec<u8>,
+    pub line: String,
+}
+
 pub trait Writer: Drop {
     fn stream(&mut self) -> &mut tc::StandardStream;
 }
@@ -161,8 +166,7 @@ fn print_line(config: &Config, mut output: &mut Output, filename: &str, i: usize
     println!("{}", line);
 }
 
-fn is_binary(file: &mut fs::File) -> bool {
-    let mut buffer: Vec<u8> = vec![];
+fn is_binary(file: &mut fs::File, mut buffer: &mut Vec<u8>) -> bool {
     if file.take(1024 as u64).read_to_end(&mut buffer).is_ok() {
         let content_type = content_inspector::inspect(&buffer);
         content_type == content_inspector::ContentType::BINARY
@@ -184,7 +188,7 @@ fn matches(config: &Config, string: &str, line: &str) -> bool {
     }
 }
 
-fn search_file(config: &Config, mut output: &mut Output, string: &str, path: &Path) {
+fn search_file(config: &Config, buffer: &mut Buffer, mut output: &mut Output, string: &str, path: &Path) {
     if !path.exists() {
         let mut err_writer = ErrWriter::new(&mut output);
         writeln!(
@@ -198,7 +202,8 @@ fn search_file(config: &Config, mut output: &mut Output, string: &str, path: &Pa
     let filename = path_to_string(config, path);
     match fs::File::open(path) {
         Ok(mut file) => {
-            if is_binary(&mut file) {
+            buffer.binary.clear();
+            if is_binary(&mut file, &mut buffer.binary) {
                 if config.warnings {
                     let mut warn_writer = WarnWriter::new(&mut output);
                     writeln!(
@@ -221,12 +226,25 @@ fn search_file(config: &Config, mut output: &mut Output, string: &str, path: &Pa
                 .unwrap();
                 return;
             };
-            let reader = io::BufReader::new(file);
-            for (i, line) in reader.lines().enumerate() {
-                match line {
-                    Ok(line) => {
-                        if matches(&config, string, &line) {
-                            print_line(config, &mut output, &filename, i + 1, &line);
+            let mut reader = io::BufReader::new(file);
+            let mut i = 0;
+            loop {
+                i += 1;
+                buffer.line.clear();
+                match reader.read_line(&mut buffer.line) {
+                    Ok(len) => {
+                        if len == 0 {
+                            break;
+                        }
+                        let slice = buffer.line.trim_end();
+                        if slice.is_empty() {
+                            continue;
+                        }
+                        if config.regex.is_none() && string.len() > slice.len() {
+                            continue;
+                        }
+                        if matches(&config, string, slice) {
+                            print_line(config, &mut output, &filename, i, slice);
                         }
                     }
                     Err(err) => {
@@ -258,7 +276,7 @@ fn search_file(config: &Config, mut output: &mut Output, string: &str, path: &Pa
     }
 }
 
-fn search_dir(config: &Config, mut output: &mut Output, string: &str, dir: &Path) {
+fn search_dir(config: &Config, mut buffer: &mut Buffer, mut output: &mut Output, string: &str, dir: &Path) {
     if !dir.exists() {
         let mut err_writer = ErrWriter::new(&mut output);
         writeln!(
@@ -275,7 +293,7 @@ fn search_dir(config: &Config, mut output: &mut Output, string: &str, dir: &Path
                 match entry {
                     Ok(entry) => {
                         let path = entry.path();
-                        search(&config, &mut output, string, &path, false);
+                        search(&config, &mut buffer, &mut output, string, &path, false);
                     }
                     Err(err) => {
                         let mut err_writer = ErrWriter::new(&mut output);
@@ -303,7 +321,7 @@ fn search_dir(config: &Config, mut output: &mut Output, string: &str, dir: &Path
     }
 }
 
-pub fn search(config: &Config, mut output: &mut Output, string: &str, path: &Path, initial: bool) {
+pub fn search(config: &Config, mut buffer: &mut Buffer, mut output: &mut Output, string: &str, path: &Path, initial: bool) {
     if !path.exists() {
         let mut err_writer = ErrWriter::new(&mut output);
         writeln!(
@@ -317,10 +335,10 @@ pub fn search(config: &Config, mut output: &mut Output, string: &str, path: &Pat
     match resolve_path(&config, &mut output, path) {
         Some(path) => {
             if path.is_file() {
-                search_file(&config, &mut output, string, &path);
+                search_file(&config, &mut buffer, &mut output, string, &path);
             } else if path.is_dir() {
                 if initial || config.recursive {
-                    search_dir(&config, &mut output, string, &path);
+                    search_dir(&config, &mut buffer, &mut output, string, &path);
                 }
             } else {
                 let mut err_writer = ErrWriter::new(&mut output);

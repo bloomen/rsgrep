@@ -152,5 +152,9 @@ fn main() {
         string = string.to_lowercase();
     }
 
-    search(&config, &mut output, &string, path, true);
+    let mut buffer = Buffer{
+        binary: vec![],
+        line: String::new(),
+    };
+    search(&config, &mut buffer, &mut output, &string, path, true);
 }
