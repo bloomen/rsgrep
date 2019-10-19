@@ -10,7 +10,7 @@ use rsgrep::*;
 
 fn main() {
     let matches = App::new("rsgrep")
-        .version("0.4.0")
+        .version("0.5.0")
         .about("A simple version of grep implemented in Rust")
         .author("Christian Blume")
         .arg(
