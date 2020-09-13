@@ -62,7 +62,7 @@ fn main() {
             Arg::with_name("relative")
                 .short("t")
                 .long("relative")
-                .help("Print relative filenames")
+                .help("Print relative filenames. Assumes searching below current directory.")
                 .takes_value(false),
         )
         .arg(

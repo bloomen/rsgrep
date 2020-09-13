@@ -117,8 +117,9 @@ impl<'a> Drop for WarnWriter<'a> {
 }
 
 fn path_to_string(config: &Config, path: &Path) -> String {
-    if config.relative {
-        match path.strip_prefix(&config.cwd).unwrap().to_str() {
+    let res = path.strip_prefix(&config.cwd);
+    if config.relative && res.is_ok() {
+        match res.unwrap().to_str() {
             Some(name) => String::from(name),
             None => String::from("<None>"),
         }
